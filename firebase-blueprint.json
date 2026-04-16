@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System users including students, admins, and rectors.",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "passport": { "type": "string" },
+        "group_number": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "admin", "rector"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "floor": { "type": "number" },
+        "room": { "type": "string" },
+        "fullName": { "type": "string" }
+      },
+      "required": ["username", "password", "role"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "Dormitory rooms.",
+      "type": "object",
+      "properties": {
+        "floor": { "type": "number" },
+        "roomNumber": { "type": "string" },
+        "capacity": { "type": "number" },
+        "currentOccupancy": { "type": "number" },
+        "status": { "type": "string", "enum": ["green", "red"] }
+      },
+      "required": ["floor", "roomNumber", "capacity"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Messages sent between students and admin/rector.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "receiverRole": { "type": "string", "enum": ["admin", "rector"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "receiverRole", "content"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System notifications for admins and rectors.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" },
+        "targetRole": { "type": "string" }
+      },
+      "required": ["content", "targetRole"]
+    },
+    "Config": {
+      "title": "Config",
+      "description": "Extra configuration like dynamic sidebar sections.",
+      "type": "object",
+      "properties": {
+        "sidebarSections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and authentication data."
+    },
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Dormitory room details."
+    },
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Communication between users."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "System alerts."
+    },
+    "/config/system": {
+      "schema": "Config",
+      "description": "Global system configuration."
+    }
+  }
+}

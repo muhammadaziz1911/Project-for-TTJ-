@@ -1,0 +1,172 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields:
+    //   - username: string (required)
+    //   - fullName: string (optional)
+    //   - password: string (required)
+    //   - passport: string (optional)
+    //   - group_number: string (optional)
+    //   - role: string (enum: student, admin, rector)
+    //   - status: string (enum: pending, approved, rejected)
+    //   - floor: number (optional)
+    //   - room: string (optional)
+    //
+    // Collection: rooms
+    // Fields:
+    //   - floor: number (required)
+    //   - roomNumber: string (required)
+    //   - capacity: number (required)
+    //   - currentOccupancy: number (required)
+    //   - status: string (enum: green, red)
+    //
+    // Collection: messages
+    // Fields:
+    //   - senderId: string (required)
+    //   - senderName: string (required)
+    //   - receiverRole: string (enum: admin, rector)
+    //   - content: string (required)
+    //   - timestamp: timestamp (required)
+    //
+    // Collection: notifications
+    // Fields:
+    //   - type: string (required)
+    //   - content: string (required)
+    //   - timestamp: timestamp (required)
+    //   - read: boolean (required)
+    //   - targetRole: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (request.auth.token.email == "azizbekmaxmudov22@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isRector() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'rector')
+      );
+    }
+
+    function hasOnlyAllowedFields(allowedFields) {
+      return request.resource.data.keys().hasOnly(allowedFields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.username is string && data.username.size() > 0 && data.username.size() < 100 &&
+             data.role in ['student', 'admin', 'rector'] &&
+             (!('status' in data) || data.status in ['pending', 'approved', 'rejected']) &&
+             (!('fullName' in data) || (data.fullName is string && data.fullName.size() < 100));
+    }
+
+    function isValidRoom(data) {
+      return data.floor is number && data.roomNumber is string &&
+             data.capacity is number && data.capacity > 0 &&
+             data.currentOccupancy is number && data.currentOccupancy >= 0 &&
+             data.status in ['green', 'red'];
+    }
+
+    function isValidMessage(data) {
+      return data.senderId is string && data.senderName is string &&
+             data.receiverRole in ['admin', 'rector'] &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 5000;
+    }
+
+    function isValidNotification(data) {
+      return data.type is string && data.content is string &&
+             data.read is bool && data.targetRole is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin() || isRector());
+      
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && request.resource.data.role == 'student') || 
+        isAdmin() ||
+        (isOwner(userId) && (request.auth.token.email == 'admin@ttj.uz' || request.auth.token.email == 'rector@ttj.uz'))
+      );
+      
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && areImmutableFieldsUnchanged(['role', 'status'])) || 
+        isAdmin()
+      );
+      
+      allow delete: if isAdmin();
+    }
+
+    match /rooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidRoom(request.resource.data);
+      allow update: if isAdmin() && isValidRoom(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.senderId || 
+        isAdmin() || 
+        isRector()
+      );
+      
+      allow create: if isAuthenticated() && isValidMessage(request.resource.data) && (
+        request.resource.data.senderId == request.auth.uid
+      );
+      
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        (isAdmin() && resource.data.targetRole == 'admin') ||
+        (isRector() && resource.data.targetRole == 'rector')
+      );
+      
+      allow create: if isAuthenticated() && isValidNotification(request.resource.data);
+      
+      allow update: if isAuthenticated() && (isAdmin() || isRector()) && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      
+      allow delete: if isAdmin();
+    }
+
+    match /config/system {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
