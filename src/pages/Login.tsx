@@ -259,12 +259,7 @@ export default function Login() {
           </div>
         </form>
 
-        <div className="bg-slate-50 p-4 border-t border-border-main text-center">
-          <p className="text-[10px] text-text-muted uppercase tracking-widest leading-relaxed">
-            Admin: <span className="font-bold text-text-main">admin</span> / <span className="font-bold text-text-main">admin123</span><br/>
-            Rektor: <span className="font-bold text-text-main">rector</span> / <span className="font-bold text-text-main">rector123</span>
-          </p>
-        </div>
+        
       </motion.div>
     </div>
   );
